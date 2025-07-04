@@ -1,0 +1,36 @@
+# .NET Core
+bin/
+obj/
+*.user
+*.suo
+*.userosscache
+*.sln.docstates
+
+# Visual Studio Code
+.vscode/
+.history/
+
+# OS generated files
+.DS_Store
+Thumbs.db
+
+# ASP.NET
+wwwroot/lib/
+
+# Logs
+*.log
+
+# Rider
+.idea/
+*.sln.iml
+
+# User secrets
+secrets.json
+
+# npm packages (if using npm for frontend)
+node_modules/
+
+# Others
+*.swp
+*.bak
+*.tmp
