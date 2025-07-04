@@ -23,6 +23,17 @@ public class HomeController : Controller
         return View();
     }
 
+    [HttpPost]
+    public IActionResult UploadOfx()
+    {
+        var file = Request.Form.Files.FirstOrDefault();
+        if (file != null && Path.GetExtension(file.FileName).ToLower() == ".ofx")
+        {
+            return Content("success");
+        }
+        return Content("error: not an OFX file");
+    }
+
     [ResponseCache(Duration = 0, Location = ResponseCacheLocation.None, NoStore = true)]
     public IActionResult Error()
     {

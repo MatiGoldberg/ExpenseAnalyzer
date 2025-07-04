@@ -1,0 +1,42 @@
+@{
+    ViewData["Title"] = "Upload OFX";
+}
+
+<h2>Upload OFX File</h2>
+<form id="ofxUploadForm" enctype="multipart/form-data" method="post" asp-action="UploadOfx" asp-controller="Home">
+    <div class="mb-3">
+        <input class="form-control" type="file" name="ofxFile" id="ofxFile" accept=".ofx" required />
+    </div>
+    <button type="submit" class="btn btn-primary">Upload</button>
+</form>
+<div id="ofxUploadResult" class="mt-3"></div>
+@section Scripts {
+    <script>
+        document.getElementById('ofxUploadForm').addEventListener('submit', async function (e) {
+            e.preventDefault();
+            const fileInput = document.getElementById('ofxFile');
+            const file = fileInput.files[0];
+            const resultDiv = document.getElementById('ofxUploadResult');
+            if (!file) {
+                resultDiv.innerHTML = '<div class="alert alert-danger">Please select a file.</div>';
+                return;
+            }
+            if (!file.name.toLowerCase().endsWith('.ofx')) {
+                resultDiv.innerHTML = '<div class="alert alert-danger">Error: not an OFX file.</div>';
+                return;
+            }
+            const formData = new FormData();
+            formData.append('ofxFile', file);
+            const response = await fetch('/Home/UploadOfx', {
+                method: 'POST',
+                body: formData
+            });
+            const text = await response.text();
+            if (response.ok && text === 'success') {
+                resultDiv.innerHTML = '<div class="alert alert-success">Success</div>';
+            } else {
+                resultDiv.innerHTML = '<div class="alert alert-danger">Error: not an OFX file.</div>';
+            }
+        });
+    </script>
+}
