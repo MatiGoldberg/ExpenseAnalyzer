@@ -24,7 +24,7 @@
   </ItemGroup>
 
   <ItemGroup>
-    <ProjectReference Include="..\ExpenseAnalyzer.csproj" />
+    <ProjectReference Include="..\ExpenseAnalyzer\ExpenseAnalyzer.csproj" />
   </ItemGroup>
 
 </Project>
