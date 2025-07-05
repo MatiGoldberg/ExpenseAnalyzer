@@ -3,6 +3,7 @@ using System.Collections.Generic;
 using System.Linq;
 using System.Text.RegularExpressions;
 using System.Xml.Linq;
+using System.Xml.Schema;
 
 namespace ExpenseAnalyzer.Models
 {
@@ -29,11 +30,29 @@ namespace ExpenseAnalyzer.Models
                 // Remove OFX headers if present
                 int xmlStart = ofxContent.IndexOf("<OFX", StringComparison.OrdinalIgnoreCase);
                 if (xmlStart > 0)
+                {
+                    string ofxHeader = ofxContent.Substring(0, xmlStart);
+                    if (!ValidateHeader(ofxHeader))
+                    {
+                        _error = "Unsupported OFX format.";
+                        return false;
+                    }
                     ofxContent = ofxContent.Substring(xmlStart);
+                }
+                else
+                {
+                    _error = "Invalid OFX format.";
+                    return false;
+                }
 
                 // Convert SGML to XML (close tags)
-                // string xmlContent = Regex.Replace(ofxContent, @"<(\w+)>(([^<\r\n]+))", "<$1>$2</$1>");
-                string xmlContent = ofxContent;
+                string xmlContent = PreprocessSgmlToXml(ofxContent);
+                if (string.IsNullOrEmpty(xmlContent))
+                {
+                    _error = "Failed to preprocess SGML to XML.";
+                    return false;
+                }
+
                 var doc = XDocument.Parse(xmlContent);
 
                 var stmttrnrs = doc.Descendants().Where(x => x.Name.LocalName.ToUpper() == "STMTTRNRS");
@@ -74,8 +93,48 @@ namespace ExpenseAnalyzer.Models
 
         public IReadOnlyList<Transaction> GetTransactions() => _transactions.AsReadOnly();
 
-        private static string PreprocessOfxToXml(string ofx)
+        public bool ValidateHeader(string ofxHeader)
         {
+            // Expected fields and values
+            var expected = new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase)
+            {
+                {"OFXHEADER", "100"},
+                {"DATA", "OFXSGML"},
+                {"VERSION", "102"},
+                {"SECURITY", "NONE"},
+                {"ENCODING", "USASCII"},
+                {"CHARSET", "1252"},
+                {"COMPRESSION", "NONE"},
+                {"OLDFILEUID", "NONE"},
+                {"NEWFILEUID", "NONE"}
+            };
+
+            var lines = ofxHeader.Split(new[] {'\r', '\n'}, StringSplitOptions.RemoveEmptyEntries);
+            var found = new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase);
+            foreach (var line in lines)
+            {
+                var parts = line.Split(':', 2);
+                if (parts.Length == 2)
+                {
+                    found[parts[0].Trim()] = parts[1].Trim();
+                }
+            }
+
+            foreach (var kvp in expected)
+            {
+                if (!found.TryGetValue(kvp.Key, out var value) || !string.Equals(value, kvp.Value, StringComparison.OrdinalIgnoreCase))
+                {
+                    return false;
+                }
+            }
+            return true;
+        }
+
+        private static string PreprocessSgmlToXml(string ofx)
+        {
+            // TODO: Fix this
+
+            
             // OFX files often have tags like <TAG>value\n, not <TAG>value</TAG>
             // Convert to well-formed XML
             string xml = Regex.Replace(ofx, @"<(\w+)>(([^<\r\n]+))", "<$1>$2</$1>");
