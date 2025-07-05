@@ -18,5 +18,6 @@ namespace ExpenseAnalyzer.Models
         public required string Name { get; set; } // NAME
         public required string Memo { get; set; } // MEMO
         public required Account Account { get; set; } // Associated account
+        public  ExpenseCategory? Category { get; set; } // Associated category
     }
 }
