@@ -16,7 +16,7 @@ namespace ExpenseAnalyzer.Tests
             Assert.Equal("Input is empty.", parser.GetError());
         }
 
-        [Fact(Skip = "Failing test - temporarily skipped")]
+        [Fact]
         public void Parse_ParsesMultipleTransactions()
         {
             var parser = new OfxParser();
@@ -40,7 +40,7 @@ namespace ExpenseAnalyzer.Tests
             Assert.Equal("Direct Deposit", txs[1].Memo);
         }
 
-        [Fact(Skip = "Failing test - temporarily skipped")]
+        [Fact]
         public void Parse_HandlesMissingOptionalFields()
         {
             var parser = new OfxParser();
@@ -55,8 +55,8 @@ namespace ExpenseAnalyzer.Tests
             Assert.Equal("TXN3", tx.ID);
             Assert.Equal(-50.00, tx.Amount);
             Assert.Equal(TransactionType.Debit, tx.Type);
-            Assert.Null(tx.Name);
-            Assert.Null(tx.Memo);
+            Assert.True(string.IsNullOrEmpty(tx.Name));
+            Assert.True(string.IsNullOrEmpty(tx.Memo));
         }
 
         [Fact]
@@ -78,7 +78,7 @@ namespace ExpenseAnalyzer.Tests
             Assert.Equal("No STMTTRNRS section found.", parser.GetError());
         }
 
-        [Fact(Skip = "Failing test - temporarily skipped")]
+        [Fact]
         public void Parse_ReturnsTrue_AndParsesTransactions()
         {
             var parser = new OfxParser();

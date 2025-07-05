@@ -32,7 +32,8 @@ namespace ExpenseAnalyzer.Models
                     ofxContent = ofxContent.Substring(xmlStart);
 
                 // Convert SGML to XML (close tags)
-                string xmlContent = Regex.Replace(ofxContent, @"<(\w+)>(([^<\r\n]+))", "<$1>$2</$1>");
+                // string xmlContent = Regex.Replace(ofxContent, @"<(\w+)>(([^<\r\n]+))", "<$1>$2</$1>");
+                string xmlContent = ofxContent;
                 var doc = XDocument.Parse(xmlContent);
 
                 var stmttrnrs = doc.Descendants().Where(x => x.Name.LocalName.ToUpper() == "STMTTRNRS");
