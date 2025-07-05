@@ -8,6 +8,7 @@
 
   <ItemGroup>
     <PackageReference Include="bootstrap" Version="5.3.7" />
+    <PackageReference Include="xunit" Version="2.9.3" />
   </ItemGroup>
 
 </Project>
