@@ -1,0 +1,29 @@
+@model IEnumerable<ExpenseAnalyzer.Models.Transaction>
+@{
+    ViewData["Title"] = "Transactions";
+}
+
+<h2>Transactions</h2>
+<table class="table table-striped">
+    <thead>
+        <tr>
+            <th>Source</th>
+            <th>Date</th>
+            <th>Amount</th>
+            <th>Name</th>
+            <th>Memo</th>
+        </tr>
+    </thead>
+    <tbody>
+    @foreach (var tx in Model)
+    {
+        <tr>
+            <td>@tx.Account.AccountId</td>
+            <td>@tx.Date.ToString("yyyy-MM-dd")</td>
+            <td>@tx.Amount.ToString("C")</td>
+            <td>@tx.Name</td>
+            <td>@tx.Memo</td>
+        </tr>
+    }
+    </tbody>
+</table>

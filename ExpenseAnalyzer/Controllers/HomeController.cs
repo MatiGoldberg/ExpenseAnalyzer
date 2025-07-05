@@ -27,11 +27,28 @@ public class HomeController : Controller
     public IActionResult UploadOfx()
     {
         var file = Request.Form.Files.FirstOrDefault();
-        if (file != null && Path.GetExtension(file.FileName).ToLower() == ".ofx")
+        _logger.LogInformation("UploadOfx called. File present: {FilePresent}, FileName: {FileName}", file != null, file?.FileName);
+        if (file == null || Path.GetExtension(file.FileName).ToLower() != ".ofx")
         {
-            return Content("success");
+            _logger.LogWarning("Upload failed: not an OFX file or file missing.");
+            TempData["OfxError"] = "Error: not an OFX file.";
+            return RedirectToAction("UploadOfx");
         }
-        return Content("error: not an OFX file");
+
+        using var reader = new StreamReader(file.OpenReadStream());
+        string ofxContent = reader.ReadToEnd();
+        _logger.LogInformation("OFX file read. Length: {Length}", ofxContent.Length);
+        var parser = new OfxParser();
+        bool result = parser.Parse(ofxContent);
+        if (!result)
+        {
+            _logger.LogError("OFX parsing failed: {Error}", parser.GetError());
+            TempData["OfxError"] = parser.GetError() ?? "Unknown error.";
+            return RedirectToAction("UploadOfx");
+        }
+        var transactions = parser.GetTransactions();
+        _logger.LogInformation("OFX parsing succeeded. Transactions parsed: {Count}", transactions.Count);
+        return View("Transactions", transactions);
     }
 
     [ResponseCache(Duration = 0, Location = ResponseCacheLocation.None, NoStore = true)]
