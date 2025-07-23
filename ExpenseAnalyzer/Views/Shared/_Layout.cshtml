@@ -87,15 +87,24 @@
                     }
                     const formData = new FormData();
                     formData.append('ofxFile', file);
-                    const response = await fetch('/Home/UploadOfx', {
-                        method: 'POST',
-                        body: formData
-                    });
-                    const text = await response.text();
-                    if (response.ok && text === 'success') {
-                        resultDiv.innerHTML = '<div class="alert alert-success">Success</div>';
-                    } else {
-                        resultDiv.innerHTML = '<div class="alert alert-danger">Error: not an OFX file.</div>';
+                    try {
+                        const response = await fetch('/Home/UploadOfx', {
+                            method: 'POST',
+                            body: formData
+                        });
+                        const text = await response.text();
+                        const trimmedText = text.trim().toLowerCase();
+                        console.log('Upload response:', trimmedText);
+                        if (response.ok && trimmedText === 'success') {
+                            // Redirect to transactions page on success
+                            window.location.href = '/Home/Transactions';
+                        } else {
+                            // Show actual error message from server, or fallback
+                            let errorMsg = text && text.trim() ? text.trim() : 'Unknown error uploading file.';
+                            resultDiv.innerHTML = `<div class=\"alert alert-danger\">Error: ${errorMsg}</div>`;
+                        }
+                    } catch (err) {
+                        resultDiv.innerHTML = `<div class="alert alert-danger">Error: ${err.message}</div>`;
                     }
                 });
             }

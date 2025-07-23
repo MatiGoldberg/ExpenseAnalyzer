@@ -1,6 +1,7 @@
 using System.Diagnostics;
 using Microsoft.AspNetCore.Mvc;
 using ExpenseAnalyzer.Models;
+using ExpenseAnalyzer.Helpers;
 
 namespace ExpenseAnalyzer.Controllers;
 
@@ -31,8 +32,7 @@ public class HomeController : Controller
         if (file == null || Path.GetExtension(file.FileName).ToLower() != ".ofx")
         {
             _logger.LogWarning("Upload failed: not an OFX file or file missing.");
-            TempData["OfxError"] = "Error: not an OFX file.";
-            return RedirectToAction("UploadOfx");
+            return Content("Error: not an OFX file.");
         }
 
         using var reader = new StreamReader(file.OpenReadStream());
@@ -43,12 +43,19 @@ public class HomeController : Controller
         if (!result)
         {
             _logger.LogError("OFX parsing failed: {Error}", parser.GetError());
-            TempData["OfxError"] = parser.GetError() ?? "Unknown error.";
-            return RedirectToAction("UploadOfx");
+            return Content(parser.GetError() ?? "Unknown error.");
         }
+        // Store transactions in session
         var transactions = parser.GetTransactions();
+        HttpContext.Session.SetObject("Transactions", transactions);
         _logger.LogInformation("OFX parsing succeeded. Transactions parsed: {Count}", transactions.Count);
-        return View("Transactions", transactions);
+        return Content("success");
+    }
+
+    public IActionResult Transactions()
+    {
+        var transactions = HttpContext.Session.GetObject<List<Transaction>>("Transactions") ?? new List<Transaction>();
+        return View(transactions);
     }
 
     [ResponseCache(Duration = 0, Location = ResponseCacheLocation.None, NoStore = true)]
