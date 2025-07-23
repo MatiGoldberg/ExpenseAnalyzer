@@ -29,24 +29,21 @@ namespace ExpenseAnalyzer.Models
 
                 // Remove OFX headers if present
                 int xmlStart = ofxContent.IndexOf("<OFX", StringComparison.OrdinalIgnoreCase);
-                if (xmlStart > 0)
-                {
-                    string ofxHeader = ofxContent.Substring(0, xmlStart);
-                    if (!ValidateHeader(ofxHeader))
-                    {
-                        _error = "Unsupported OFX format.";
-                        return false;
-                    }
-                    ofxContent = ofxContent.Substring(xmlStart);
-                }
-                else
+                if (xmlStart <= 0)
                 {
                     _error = "Invalid OFX format.";
                     return false;
                 }
+                string ofxHeader = ofxContent.Substring(0, xmlStart);
+                if (!ValidateHeader(ofxHeader))
+                {
+                    _error = "Invalid OFX format.";
+                    return false;
+                }
+                ofxContent = ofxContent.Substring(xmlStart);
 
                 // Convert SGML to XML (close tags)
-                string xmlContent = PreprocessSgmlToXml(ofxContent);
+                string? xmlContent = PreprocessSgmlToXml(ofxContent);
                 if (string.IsNullOrEmpty(xmlContent))
                 {
                     _error = "Failed to preprocess SGML to XML.";
@@ -130,19 +127,44 @@ namespace ExpenseAnalyzer.Models
             return true;
         }
 
-        private static string PreprocessSgmlToXml(string ofx)
+        private static string? PreprocessSgmlToXml(string ofx)
         {
-            // TODO: Fix this
+            // SGML allows for unclosed tags, which is not valid XML.
+            // The assumption is that a line can either be a tag (open or close), or a value.
+            // A value will always take the form of <TAG>value\n. To fix it, we add a closing tag.
 
-            
-            // OFX files often have tags like <TAG>value\n, not <TAG>value</TAG>
-            // Convert to well-formed XML
-            string xml = Regex.Replace(ofx, @"<(\w+)>(([^<\r\n]+))", "<$1>$2</$1>");
-            // Remove headers if present
-            int xmlStart = xml.IndexOf("<OFX", StringComparison.OrdinalIgnoreCase);
-            if (xmlStart > 0)
-                xml = xml.Substring(xmlStart);
-            return xml;
+            List<string> lines = ofx.Split(new[] { '\r', '\n' }, StringSplitOptions.RemoveEmptyEntries).ToList();
+            List<string> fixedLines = new List<string>();
+            foreach (var line in lines)
+            {
+                string trimmedLine = line.Trim();
+
+                if (string.IsNullOrEmpty(trimmedLine))
+                {
+                    continue; // Skip empty lines
+                }
+
+                // Check if the line is a tag or a value
+                if (trimmedLine.StartsWith("<") && trimmedLine.EndsWith(">"))
+                {
+                    // It's a tag, just add it
+                    fixedLines.Add(line);
+                }
+                else if (trimmedLine.StartsWith("<") && !trimmedLine.EndsWith("/>"))
+                {
+                    string tagName = trimmedLine.Substring(1, trimmedLine.IndexOf('>') - 1).Trim();
+                    // It's a value, assume it needs closing
+                    fixedLines.Add(line + $"</{tagName}>");
+                }
+                else
+                {
+                    return null; // Invalid line format
+                }
+            }
+
+            // Join the fixed lines into a single XML string
+            string xmlContent = string.Join("\n", fixedLines);
+            return xmlContent;
         }
 
         private static Account ParseAccount(XElement stmtrs)

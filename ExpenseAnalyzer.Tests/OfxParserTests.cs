@@ -2,11 +2,23 @@ using System;
 using Xunit;
 using ExpenseAnalyzer.Models;
 using System.Collections.Generic;
+using ExpenseAnalyzer.Tests;
 
 namespace ExpenseAnalyzer.Tests
 {
     public class OfxParserTests
     {
+        [Fact]
+        public void OfxBuilderTest()
+        {
+            var builder = new OfxBuilder();
+            builder.AddSection()
+                   .SetAccount(OfxBuilderSamples.SampleAccount)
+                   .AddTransactions(new[] { OfxBuilderSamples.SampleTransaction, OfxBuilderSamples.SampleTransaction });
+            string ofx = builder.Build();
+            File.WriteAllText("/Users/matigoldberg/Drive/Code/ExpenseAnalyzer/ExpenseAnalyzer/test.ofx", ofx);
+        }
+
         [Fact]
         public void Parse_ReturnsFalse_OnEmptyInput()
         {
@@ -17,36 +29,106 @@ namespace ExpenseAnalyzer.Tests
         }
 
         [Fact]
-        public void Parse_ParsesMultipleTransactions()
+        public void Parse_ReturnsFalse_EmptyOfx()
         {
             var parser = new OfxParser();
-            string ofx = @"<OFX><BANKMSGSRSV1><STMTTRNRS><STMTRS><CURDEF>USD</CURDEF><BANKACCTFROM><BANKID>USA</BANKID><ACCTID>123456789</ACCTID><ACCTTYPE>SAVINGS</ACCTTYPE></BANKACCTFROM><BANKTRANLIST>"
-                + "<STMTTRN><TRNTYPE>DEBIT</TRNTYPE><DTPOSTED>20250601000000.000[-08:PST]</DTPOSTED><TRNAMT>-100.00</TRNAMT><FITID>TXN1</FITID><NAME>Withdrawal ATM</NAME><MEMO>ATM Withdrawal</MEMO></STMTTRN>"
-                + "<STMTTRN><TRNTYPE>CREDIT</TRNTYPE><DTPOSTED>20250602000000.000[-08:PST]</DTPOSTED><TRNAMT>200.00</TRNAMT><FITID>TXN2</FITID><NAME>Deposit</NAME><MEMO>Direct Deposit</MEMO></STMTTRN>"
-                + "</BANKTRANLIST></STMTRS></STMTTRNRS></BANKMSGSRSV1></OFX>";
+            var builder = new OfxBuilder();
+            builder.AddSection();
+            string emptyOfx = builder.Build();
+            bool result = parser.Parse(emptyOfx);
+            Assert.False(result);
+            Assert.Equal("No STMTTRNRS section found.", parser.GetError());
+        }
+
+        [Fact]
+        public void Parse_SingleSectionSingleTransaction()
+        {
+            var account = OfxBuilderSamples.SampleAccount;
+            var transaction = OfxBuilderSamples.SampleTransaction;
+            var builder = new OfxBuilder();
+            builder.AddSection()
+                   .SetAccount(account)
+                   .AddTransactions(new[] { transaction });
+            string ofx = builder.Build();
+            var parser = new OfxParser();
+            bool result = parser.Parse(ofx);
+            Assert.True(result);
+            var txs = parser.GetTransactions();
+            Assert.Single(txs);
+            var tx = txs[0];
+            Assert.Equal(transaction.ID, tx.ID);
+            Assert.Equal(transaction.Amount, tx.Amount);
+            Assert.Equal(transaction.Type, tx.Type);
+            Assert.Equal(transaction.Name, tx.Name);
+            Assert.Equal(transaction.Memo, tx.Memo);
+            Assert.NotNull(tx.Account);
+            Assert.Equal(account.Currency, tx.Account.Currency);
+            Assert.Equal(account.AccountId, tx.Account.AccountId);
+            Assert.Equal(account.AccountType, tx.Account.AccountType);
+        }
+
+        [Fact]
+        public void Parse_ParsesMultipleTransactions()
+        {
+            var account = OfxBuilderSamples.SampleAccount;
+            var transaction1 = OfxBuilderSamples.SampleTransaction;
+            var transaction2 = new Transaction
+            {
+                Date = new DateTime(2025, 1, 2),
+                ID = "TXN1002",
+                Amount = -100.13,
+                Type = TransactionType.Credit,
+                Name = "Spending at Store",
+                Memo = "N/A",
+                Account = account
+            };
+            var builder = new OfxBuilder();
+            builder.AddSection()
+                   .SetAccount(account)
+                   .AddTransactions(new[] { transaction1, transaction2 });
+            string ofx = builder.Build();
+            var parser = new OfxParser();
             bool result = parser.Parse(ofx);
             Assert.True(result);
             var txs = parser.GetTransactions();
             Assert.Equal(2, txs.Count);
-            Assert.Equal("TXN1", txs[0].ID);
-            Assert.Equal(-100.00, txs[0].Amount);
-            Assert.Equal(TransactionType.Debit, txs[0].Type);
-            Assert.Equal("Withdrawal ATM", txs[0].Name);
-            Assert.Equal("ATM Withdrawal", txs[0].Memo);
-            Assert.Equal("TXN2", txs[1].ID);
-            Assert.Equal(200.00, txs[1].Amount);
-            Assert.Equal(TransactionType.Credit, txs[1].Type);
-            Assert.Equal("Deposit", txs[1].Name);
-            Assert.Equal("Direct Deposit", txs[1].Memo);
+            var tx1 = txs[0];
+            Assert.Equal(transaction1.ID, tx1.ID);
+            Assert.Equal(transaction1.Amount, tx1.Amount);
+            Assert.Equal(transaction1.Type, tx1.Type);
+            Assert.Equal(transaction1.Name, tx1.Name);
+            Assert.Equal(transaction1.Memo, tx1.Memo);
+            Assert.NotNull(tx1.Account);
+            Assert.Equal(account.Currency, tx1.Account.Currency);
+            Assert.Equal(account.AccountId, tx1.Account.AccountId);
+            Assert.Equal(account.AccountType, tx1.Account.AccountType);
         }
 
         [Fact]
         public void Parse_HandlesMissingOptionalFields()
         {
+            var account = new Account
+            {
+                AccountId = 111222333,
+                AccountType = AccountType.Checking,
+                Currency = "USD"
+            };
+            var transaction = new Transaction
+            {
+                Date = new DateTime(2025, 7, 1),
+                ID = "TXN3",
+                Amount = -50.00,
+                Type = TransactionType.Debit,
+                Name = string.Empty,
+                Memo = string.Empty,
+                Account = account
+            };
+            var builder = new OfxBuilder();
+            builder.AddSection()
+                   .SetAccount(account)
+                   .AddTransactions(new[] { transaction });
+            string ofx = builder.Build();
             var parser = new OfxParser();
-            string ofx = @"<OFX><BANKMSGSRSV1><STMTTRNRS><STMTRS><CURDEF>USD</CURDEF><BANKACCTFROM><BANKID>USA</BANKID><ACCTID>111222333</ACCTID><ACCTTYPE>CHECKING</ACCTTYPE></BANKACCTFROM><BANKTRANLIST>"
-                + "<STMTTRN><TRNTYPE>DEBIT</TRNTYPE><DTPOSTED>20250701000000.000[-08:PST]</DTPOSTED><TRNAMT>-50.00</TRNAMT><FITID>TXN3</FITID></STMTTRN>"
-                + "</BANKTRANLIST></STMTRS></STMTTRNRS></BANKMSGSRSV1></OFX>";
             bool result = parser.Parse(ofx);
             Assert.True(result);
             var txs = parser.GetTransactions();
@@ -63,40 +145,150 @@ namespace ExpenseAnalyzer.Tests
         public void Parse_ReturnsFalse_OnInvalidXml()
         {
             var parser = new OfxParser();
-            bool result = parser.Parse("not xml");
+            // Build an invalid OFX (missing <OFX> root)
+            var builder = new OfxBuilder();
+            string invalidOfx = "not xml" + builder.Build();
+            bool result = parser.Parse(invalidOfx);
             Assert.False(result);
-            Assert.Contains("Parsing failed", parser.GetError());
+            Assert.Contains("Invalid OFX format", parser.GetError());
         }
 
         [Fact]
         public void Parse_ReturnsFalse_WhenNoStmttrnrs()
         {
             var parser = new OfxParser();
-            string ofx = "<OFX></OFX>";
+            // Build OFX with no STMTTRNRS section
+            var builder = new OfxBuilder();
+            builder.AddSection();
+            string ofx = builder.Build();
             bool result = parser.Parse(ofx);
             Assert.False(result);
             Assert.Equal("No STMTTRNRS section found.", parser.GetError());
         }
 
-        [Fact]
-        public void Parse_ReturnsTrue_AndParsesTransactions()
-        {
-            var parser = new OfxParser();
-            string ofx = @"<OFX><BANKMSGSRSV1><STMTTRNRS><STMTRS><CURDEF>USD</CURDEF><BANKACCTFROM><BANKID>USA</BANKID><ACCTID>9351720470</ACCTID><ACCTTYPE>CHECKING</ACCTTYPE></BANKACCTFROM><BANKTRANLIST><STMTTRN><TRNTYPE>CREDIT</TRNTYPE><DTPOSTED>20250428000000.000[-08:PST]</DTPOSTED><TRNAMT>6291.22</TRNAMT><FITID>20250428 3689154 629,122 202,504,282,646</FITID><NAME>ACH Deposit MICROSOFT   EDIPAYME</NAME><MEMO>ACH Deposit MICROSOFT   EDIPAYMENT </MEMO></STMTTRN></BANKTRANLIST></STMTRS></STMTTRNRS></BANKMSGSRSV1></OFX>";
-            bool result = parser.Parse(ofx);
-            Assert.True(result);
-            var txs = parser.GetTransactions();
-            Assert.Single(txs);
-            var tx = txs[0];
-            Assert.Equal("20250428 3689154 629,122 202,504,282,646", tx.ID);
-            Assert.Equal(6291.22, tx.Amount);
-            Assert.Equal(TransactionType.Credit, tx.Type);
-            Assert.Equal("ACH Deposit MICROSOFT   EDIPAYME", tx.Name);
-            Assert.Equal("ACH Deposit MICROSOFT   EDIPAYMENT ", tx.Memo);
-            Assert.NotNull(tx.Account);
-            Assert.Equal("USD", tx.Account.Currency);
-            Assert.Equal(9351720470, tx.Account.AccountId);
-            Assert.Equal(AccountType.Checking, tx.Account.AccountType);
-        }
+
+    }
+
+    public static class OfxBuilderSamples
+    {
+            public static Account SampleAccount = new Account
+            {
+                AccountId = 1234567890,
+                AccountType = AccountType.Checking,
+                Currency = "USD"
+            };
+            public static Transaction SampleTransaction = new Transaction
+            {
+                Date = new DateTime(2025, 1, 1),
+                ID = "TXN1001",
+                Amount = 1000.01,
+                Type = TransactionType.Credit,
+                Name = "ACH Deposit From Source",
+                Memo = "Memo Note",
+                Account = SampleAccount
+            };
+    }
+
+    public static class OfxParserSamples
+    {
+        public static string OfxHeader =
+            @"OFXHEADER:100
+            DATA:OFXSGML
+            VERSION:102
+            SECURITY:NONE
+            ENCODING:USASCII
+            CHARSET:1252
+            COMPRESSION:NONE
+            OLDFILEUID:NONE
+            NEWFILEUID:NONE";
+
+        public static string EmptyOfx = OfxHeader + "\n" + @"<OFX></OFX>";
+
+        public static string SingleTransaction = OfxHeader + "\n" + @"<OFX>
+    <BANKMSGSRSV1>
+        <STMTTRNRS>
+            <TRNUID>1
+            <STATUS>
+                <CODE>0
+                <SEVERITY>INFO
+            </STATUS>
+            <STMTRS>
+                <CURDEF>USD
+                <BANKACCTFROM>
+                    <BANKID>USA
+                    <ACCTID>1234567890
+                    <ACCTTYPE>CHECKING
+                </BANKACCTFROM>
+
+                <BANKTRANLIST>
+                    <DTSTART>20250101
+                    <DTEND>20251231
+                    <STMTTRN>
+                        <TRNTYPE>CREDIT
+                        <DTPOSTED>20250101000000.000[-08:PST]
+                        <TRNAMT>1000.01
+
+                        <FITID>20250101 3791312 729,121 252,504,282,646
+                        <NAME>ACH Deposit From Source
+                        <MEMO>Memo Note
+                    </STMTTRN>
+                </BANKTRANLIST>
+            </STMTRS>
+        </STMTTRNRS>
+    </BANKMSGSRSV1>
+</OFX>";
+
+        public static string MultipleTransactions = OfxHeader + "\n" + @"<OFX>
+    <BANKMSGSRSV1>
+        <STMTTRNRS>
+            <TRNUID>1
+            <STATUS>
+                <CODE>0
+                <SEVERITY>INFO
+            </STATUS>
+            <STMTRS>
+                <CURDEF>USD
+                <BANKACCTFROM>
+                    <BANKID>USA
+                    <ACCTID>1234567890
+                    <ACCTTYPE>CHECKING
+                </BANKACCTFROM>
+
+                <BANKTRANLIST>
+                    <DTSTART>20250101
+                    <DTEND>20251231
+                    <STMTTRN>
+                        <TRNTYPE>CREDIT
+                        <DTPOSTED>20250101000000.000[-08:PST]
+                        <TRNAMT>1000.01
+
+                        <FITID>20250101 3791312 729,121 252,504,282,646
+                        <NAME>ACH Deposit From Source
+                        <MEMO>Memo Note
+                    </STMTTRN>
+                                        <STMTTRN>
+                        <TRNTYPE>CREDIT
+                        <DTPOSTED>20250102000000.000[-08:PST]
+                        <TRNAMT>-100.77
+
+                        <FITID>20250102 3721412 149,131 272,554,282,646
+                        <NAME>Purchase at Store
+                        <MEMO>Store Purchase Memo
+                    </STMTTRN>
+                    <STMTTRN>
+                        <TRNTYPE>CREDIT
+                        <DTPOSTED>20250103000000.000[-08:PST]
+                        <TRNAMT>-201.33
+
+                        <FITID>20250103 3794832 329,159 281,563,212,699
+                        <NAME>Purchase at Store 2
+                        <MEMO>N/A
+                    </STMTTRN>
+                </BANKTRANLIST>
+            </STMTRS>
+        </STMTTRNRS>
+    </BANKMSGSRSV1>
+</OFX>";
+
     }
 }
